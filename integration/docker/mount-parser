@@ -1,0 +1,20 @@
+#!/bin/sh
+# Reformat /proc/mounts into the "device on mountpoint type fstype (options)"
+# format that Alluxio 1.8.1's UnixMountInfo parser expects.
+#
+# Why: Alluxio 1.8.1 runs `mount` and parses each line with
+#   ".* (type \\w+ ).*" then "(.*) on (.*) \\((.*)\\)".
+# When busybox `mount` emits raw /proc/mounts lines (no " on ", no "(opts)"),
+# the second regex fails and the built UnixMountInfo has a null Options object.
+# StorageTier.checkEnoughMemSpace() then calls getOptions().getSize() on null,
+# throwing a NullPointerException that crashes the worker. This wrapper always
+# emits the format Alluxio expects, so it parses cleanly and the MEM-capacity
+# check works (or degrades to a harmless warning).
+#
+# /usr/local/bin precedes /bin in PATH, so this shadows busybox's mount.
+
+awk '{
+  if (NF >= 4) {
+    print $1 " on " $2 " type " $3 " (" $4 ")"
+  }
+}' /proc/mounts
